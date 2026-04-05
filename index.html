@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>The Duck Champion</title>
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+body{
+margin:0;
+background:#111;
+color:white;
+font-family:Arial;
+text-align:center;
+}
+
+h1{font-size:clamp(28px,6vw,46px);margin:10px}
+
+#topBar{
+display:flex;
+justify-content:center;
+gap:15px;
+flex-wrap:wrap;
+}
+
+.topBtn{
+padding:12px 22px;
+font-size:clamp(16px,3vw,22px);
+font-weight:bold;
+cursor:pointer;
+}
+
+#stats{
+border:2px solid white;
+max-width:400px;
+margin:auto;
+padding:10px;
+font-size:clamp(14px,2.5vw,20px);
+}
+
+#canvasWrap{
+width:95%;
+max-width:900px;
+margin:auto;
+}
+
+canvas{
+width:100%;
+height:auto;
+border-top:5px solid white;
+border-bottom:5px solid white;
+}
+
+/* MOBILE CONTROLS */
+.controls{
+margin-top:10px;
+}
+
+.ctrl{
+width:clamp(60px,15vw,80px);
+height:clamp(60px,15vw,80px);
+font-size:clamp(22px,6vw,30px);
+margin:5px;
+}
+
+#gameOver{font-size:26px;margin-top:10px}
+</style>
+</head>
+
+<body>
+
+<h1>THE DUCK CHAMPION</h1>
+
+<div id="topBar">
+<button class="topBtn" onclick="startTournament()">Tournament</button>
+<button class="topBtn" onclick="showInstructions()">Instructions</button>
+</div>
+
+<h3>Train your duck, win tournaments and reach Level 15!</h3>
+
+<div id="stats">
+Money ₹<span id="money">100</span> |
+Energy <span id="energy">100</span> |
+Swimming Level <span id="level">1</span>
+</div>
+
+<div id="canvasWrap">
+<canvas id="game" width="900" height="420"></canvas>
+</div>
+
+<div class="controls">
+<button class="ctrl" onmousedown="press('ArrowUp')" onmouseup="release('ArrowUp')" ontouchstart="press('ArrowUp')" ontouchend="release('ArrowUp')">⬆</button><br>
+<button class="ctrl" onmousedown="press('ArrowLeft')" onmouseup="release('ArrowLeft')" ontouchstart="press('ArrowLeft')" ontouchend="release('ArrowLeft')">⬅</button>
+<button class="ctrl" onmousedown="press('ArrowDown')" onmouseup="release('ArrowDown')" ontouchstart="press('ArrowDown')" ontouchend="release('ArrowDown')">⬇</button>
+<button class="ctrl" onmousedown="press('ArrowRight')" onmouseup="release('ArrowRight')" ontouchstart="press('ArrowRight')" ontouchend="release('ArrowRight')">➡</button>
+</div>
+
+<div id="gameOver"></div>
+<button id="restartBtn" onclick="location.reload()" style="display:none">Play Again</button>
+
+<script>
+const canvas=document.getElementById("game");
+const ctx=canvas.getContext("2d");
+
+let keys={},wave=0,frame=0;
+function press(k){keys[k]=true}
+function release(k){keys[k]=false}
+document.addEventListener("keydown",e=>keys[e.key]=true);
+document.addEventListener("keyup",e=>keys[e.key]=false);
+
+let duck={x:120,y:200,speed:4};
+let obstacles=[],coins=[],rivals=[];
+let money=100,energy=100,level=1;
+let gameRunning=true,tournament=false;
+
+const riverTop = 120;
+const riverBottom = 380;
+const riverHeight = riverBottom - riverTop;
+
+function river(){
+ wave+=0.03;
+ for(let i=0;i<900;i++){
+  let y=20*Math.sin(i*0.02+wave)+riverTop;
+  ctx.strokeStyle="#bbb";
+  ctx.beginPath();ctx.moveTo(i,y);ctx.lineTo(i,y+riverHeight);ctx.stroke();
+ }
+}
+
+function duckDraw(x,y,color="yellow"){
+ frame+=0.2;
+ ctx.fillStyle=color;
+ ctx.beginPath();ctx.arc(x,y,18,0,6.28);ctx.fill();
+ ctx.fillStyle="orange";ctx.fillRect(x+18,y-5,16,10);
+ ctx.fillStyle="black";ctx.fillRect(x-5,y-5,5,5);
+ let kick=Math.sin(frame)*8;
+ ctx.strokeStyle="orange";ctx.lineWidth=4;
+ ctx.beginPath();ctx.moveTo(x-8,y+18);ctx.lineTo(x-8-kick,y+28);ctx.stroke();
+ ctx.beginPath();ctx.moveTo(x+5,y+18);ctx.lineTo(x+5-kick,y+28);ctx.stroke();
+}
+
+function riverSpawnY(){
+ return riverTop + 30 + Math.random()*(riverHeight-60);
+}
+
+setInterval(()=>obstacles.push({x:900,y:riverSpawnY(),type:["croc","log","tree"][Math.floor(Math.random()*3)]}),1800);
+setInterval(()=>coins.push({x:900,y:riverSpawnY()}),1500);
+
+function startTournament(){
+ tournament=true;
+ rivals=[{x:120,y:160,speed:2+level/3},{x:120,y:320,speed:2+level/3}];
+}
+
+function update(){
+ if(!gameRunning) return;
+ if(keys["ArrowUp"]) duck.y-=duck.speed;
+ if(keys["ArrowDown"]) duck.y+=duck.speed;
+ if(keys["ArrowLeft"]) duck.x-=duck.speed;
+ if(keys["ArrowRight"]) duck.x+=duck.speed;
+
+ energy-=0.02;
+ if(energy<=0) gameOver("Out of energy!");
+
+ obstacles.forEach(o=>o.x-=5);
+ coins.forEach(c=>c.x-=5);
+
+ obstacles.forEach(o=>{
+  if(Math.abs(duck.x-o.x)<30 && Math.abs(duck.y-o.y)<25)
+   gameOver("Eaten or crashed!");
+ });
+
+ coins.forEach((c,i)=>{
+  if(Math.abs(duck.x-c.x)<25 && Math.abs(duck.y-c.y)<25){
+   money+=20;
+   coins.splice(i,1);
+  }
+ });
+
+ if(tournament){
+  rivals.forEach(r=>r.x+=r.speed);
+  if(duck.x>850){level++;alert("You won the tournament!");duck.x=120;tournament=false}
+  rivals.forEach(r=>{if(r.x>850) gameOver("You lost the race!")});
+ }
+
+ if(level>=15){gameOver("YOU ARE THE DUCK CHAMPION!")}
+}
+
+function draw(){
+ ctx.clearRect(0,0,900,420);
+ river();
+ duckDraw(duck.x,duck.y);
+ rivals.forEach(r=>duckDraw(r.x,r.y,"white"));
+
+ obstacles.forEach(o=>{
+  if(o.type=="croc"){ctx.fillStyle="#1f2b1f";ctx.fillRect(o.x,o.y,60,20);}
+  if(o.type=="log"){ctx.fillStyle="#5c4033";ctx.fillRect(o.x,o.y,50,15);}
+  if(o.type=="tree"){ctx.fillStyle="#333";ctx.fillRect(o.x,o.y,15,30);}
+ });
+
+ coins.forEach(c=>{
+  ctx.fillStyle="gold";
+  ctx.beginPath();ctx.arc(c.x,c.y,7,0,6.28);ctx.fill();
+ });
+
+ document.getElementById("money").innerText=Math.floor(money);
+ document.getElementById("energy").innerText=Math.floor(energy);
+ document.getElementById("level").innerText=level;
+}
+
+function loop(){update();draw();requestAnimationFrame(loop);}
+loop();
+
+function gameOver(msg){
+ gameRunning=false;
+ document.getElementById("gameOver").innerText=msg;
+ document.getElementById("restartBtn").style.display="inline";
+}
+
+function showInstructions(){
+alert(`Arrow keys or buttons to move.
+Avoid crocodiles, logs and trees.
+Collect coins.
+Win tournaments to level up.
+Reach Level 15 to win.`);
+}
+</script>
+</body>
+</html>
